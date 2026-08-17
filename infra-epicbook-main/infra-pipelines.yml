@@ -1,0 +1,132 @@
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  name: 'SelfHostedPool'
+
+variables:
+  - group: epicbook-secrets
+  - name: terraformVersion
+    value: '1.8.5'
+  - name: azureServiceConnection
+    value: 'azure-devops-connection'
+
+steps:
+  - checkout: self
+    displayName: 'Checkout repository'
+
+  - task: DownloadSecureFile@1
+    name: sshPublicKey
+    displayName: 'Download SSH public key'
+    inputs:
+      secureFile: 'id_rsa.pub'
+
+  - script: |
+      sudo apt-get update
+      sudo apt-get install -y unzip curl
+    displayName: 'Install required packages'
+
+  - script: |
+      set -e
+      echo "Installing Terraform $(terraformVersion)..."
+      curl -Lo terraform.zip https://releases.hashicorp.com/terraform/$(terraformVersion)/terraform_$(terraformVersion)_linux_amd64.zip
+      unzip -o terraform.zip
+      sudo mv terraform /usr/local/bin/
+      terraform version
+    displayName: 'Install Terraform'
+
+  - script: |
+      mkdir -p ~/.ssh
+      cp "$(sshPublicKey.secureFilePath)" ~/.ssh/id_rsa.pub
+      chmod 644 ~/.ssh/id_rsa.pub
+      ls -l ~/.ssh
+    displayName: 'Prepare SSH Public Key'
+
+  - task: AzureCLI@2
+    displayName: 'Terraform Init'
+    inputs:
+      azureSubscription: '$(azureServiceConnection)'
+      addSpnToEnvironment: true
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        set -e
+        export ARM_CLIENT_ID="$servicePrincipalId"
+        export ARM_CLIENT_SECRET="$servicePrincipalKey"
+        export ARM_TENANT_ID="$tenantId"
+        export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+        export TF_VAR_db_password="$(db_password)"
+
+        terraform -chdir="$(Build.SourcesDirectory)" init -reconfigure
+
+  - task: AzureCLI@2
+    displayName: 'Terraform Plan'
+    inputs:
+      azureSubscription: '$(azureServiceConnection)'
+      addSpnToEnvironment: true
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        set -e
+        export ARM_CLIENT_ID="$servicePrincipalId"
+        export ARM_CLIENT_SECRET="$servicePrincipalKey"
+        export ARM_TENANT_ID="$tenantId"
+        export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+        export TF_VAR_db_password="$(db_password)"
+
+        terraform -chdir="$(Build.SourcesDirectory)" plan -out=tfplan
+
+  - task: AzureCLI@2
+    displayName: 'Terraform Apply'
+    inputs:
+      azureSubscription: '$(azureServiceConnection)'
+      addSpnToEnvironment: true
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        set -e
+        export ARM_CLIENT_ID="$servicePrincipalId"
+        export ARM_CLIENT_SECRET="$servicePrincipalKey"
+        export ARM_TENANT_ID="$tenantId"
+        export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+        export TF_VAR_db_password="$(db_password)"
+
+        terraform -chdir="$(Build.SourcesDirectory)" apply -auto-approve tfplan
+
+  - task: AzureCLI@2
+    displayName: 'Write Terraform outputs to artifact file'
+    inputs:
+      azureSubscription: '$(azureServiceConnection)'
+      addSpnToEnvironment: true
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        set -e
+        export ARM_CLIENT_ID="$servicePrincipalId"
+        export ARM_CLIENT_SECRET="$servicePrincipalKey"
+        export ARM_TENANT_ID="$tenantId"
+        export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+        export TF_VAR_db_password="$(db_password)"
+
+        PUBLIC_IP=$(terraform -chdir="$(Build.SourcesDirectory)" output -raw public_ip)
+        DB_HOST=$(terraform -chdir="$(Build.SourcesDirectory)" output -raw db_host)
+
+        mkdir -p "$(Build.ArtifactStagingDirectory)"
+
+        cat > "$(Build.ArtifactStagingDirectory)/infra-outputs.env" <<EOF
+        vmPublicIp=$PUBLIC_IP
+        db_host=$DB_HOST
+        EOF
+
+        echo "Generated infra-outputs.env:"
+        cat "$(Build.ArtifactStagingDirectory)/infra-outputs.env"
+
+  - publish: $(Build.ArtifactStagingDirectory)/infra-outputs.env
+    artifact: infra-outputs
+    displayName: 'Publish infra outputs artifact'
+
+  - script: |
+      echo "Terraform deployment completed."
+    displayName: 'Finish Infra Pipeline'
