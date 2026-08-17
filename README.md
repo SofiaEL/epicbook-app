@@ -62,6 +62,7 @@ Linux (Ubuntu)
 
 📁 Structure du Dépôt
 
+```
 epicbook-app/
 ├── infra-epicbook-main/
 │   ├── backend.tf
@@ -93,6 +94,8 @@ epicbook-app/
 │       └── README.md
 │
 └── README.md
+```
+
 
 # 🧱 1. Infrastructure — Terraform
 
