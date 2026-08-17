@@ -61,30 +61,39 @@ GitHub Actions (CI/CD)
 Linux (Ubuntu)
 
 📁 Structure du Dépôt
-Code
+
 epicbook-app/
- ├── infra-epicbook-main/
- │    ├── backend.tf
- │    ├── main.tf
- │    ├── variables.tf
- │    ├── outputs.tf
- │    ├── terraform.tfvars
- │    ├── ansible/
- │    │    ├── inventory.ini
- │    │    ├── site.yml
- │    │    └── roles/
- │    │         ├── common/
- │    │         ├── frontend/
- │    │         ├── backend/
- │    │         └── mysql/
- │    └── infra-pipelines.yml
- │
- ├── app-epicbook-main/
- │    ├── frontend/
- │    └── backend/
- │
- └── README.md
- 
+├── infra-epicbook-main/
+│   ├── backend.tf
+│   ├── main.tf
+│   ├── variables.tf
+│   ├── outputs.tf
+│   ├── terraform.tfvars
+│   ├── ansible/
+│   │   ├── inventory.ini
+│   │   ├── site.yml
+│   │   └── roles/
+│   │       ├── common/
+│   │       ├── frontend/
+│   │       ├── backend/
+│   │       └── mysql/
+│   └── infra-pipelines.yml
+│
+├── app-epicbook-main/
+│   ├── frontend/
+│   │   ├── public/
+│   │   ├── src/
+│   │   ├── package.json
+│   │   └── README.md
+│   │
+│   └── backend/
+│       ├── src/
+│       ├── config/
+│       ├── package.json
+│       └── README.md
+│
+└── README.md
+
 # 🧱 1. Infrastructure — Terraform
 
 🔹 Provisioning AWS
